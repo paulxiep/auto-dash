@@ -69,7 +69,7 @@ convergence loop (post-L1):
 
 ### Key Design Decisions
 
-1. **Two-track patcher: deterministic-first, LLM fallback.** Dispatcher routes by recipe-registry presence: `DefectType` with a registered recipe → `DeterministicPatcher`; otherwise → `LLMPatcher`. Cheaper, faster, fully reproducible for mechanical defects; LLM reserved for semantic / long-tail defects. Matches the two-track strategy surfaced in [feature_list.md](feature_list.md) §6.1.
+1. **Two-track patcher: deterministic-first, LLM fallback.** Dispatcher routes by recipe-registry presence: `DefectType` with a registered recipe → `DeterministicPatcher`; otherwise → `LLMPatcher`. Cheaper, faster, fully reproducible for mechanical defects; LLM reserved for semantic / long-tail defects. The two-track strategy was surfaced during the 2026-05 rescope (see the resume entry below) before the original single-LLM MVP.8 design was implemented.
 
 2. **B1.2 scaffolded with documented "no production defect type exercises this" gap.** Both checked defect types (`label_overlap`, `element_cutoff`) have recipes; the LLM patcher path is therefore not exercised in the demo. It is covered by `tests/test_patcher_llm.py` via a `clear_registry()` monkeypatch that forces the fallback. Module docstring on `plotlint/patcher_llm.py` explicitly states this gap. The scaffold is ready for PL-1.x defect types that won't have deterministic recipes.
 
@@ -145,8 +145,8 @@ roadmap restructure:
 
 | File | Purpose |
 |---|---|
-| `feature_list.md` | **New.** Post-pause feature inventory — original MVP scope, current dev plan (built + forward), landscape audit, and §6 open design questions (deterministic patcher, multi-CSV agent). Layperson-readable (assumes no BI / data-analysis background). |
-| `frontier_research_2026-05.md` | **New.** Point-in-time landscape snapshot: enterprise primer, AI auto-intelligence adoption (Microsoft Copilot, Snowflake Cortex Analyst, Databricks Genie, Tableau Pulse, ThoughtSpot Spotter, etc.), multi-CSV agentic product landscape, academic frontier (Spider 2.0, HyperJoin, Magneto, Reflexion, CodeAct), research-agent transferable patterns (OpenAI / Anthropic / Perplexity / Gemini Deep Research), chart auto-fix landscape, gap call. |
+| `feature_list.md` | _Scratch (uncommitted)._ Post-pause feature inventory — original MVP scope, current dev plan (built + forward), landscape audit, and §6 open design questions (deterministic patcher, multi-CSV agent). Layperson-readable (assumes no BI / data-analysis background). Excluded from git per the root-level `.md` whitelist in `.gitignore` (strategy / scratch docs don't get committed). |
+| `docs/frontier_research_2026-05.md` | **New.** Point-in-time landscape snapshot: enterprise primer, AI auto-intelligence adoption (Microsoft Copilot, Snowflake Cortex Analyst, Databricks Genie, Tableau Pulse, ThoughtSpot Spotter, etc.), multi-CSV agentic product landscape, academic frontier (Spider 2.0, HyperJoin, Magneto, Reflexion, CodeAct), research-agent transferable patterns (OpenAI / Anthropic / Perplexity / Gemini Deep Research), chart auto-fix landscape, gap call. Lives under `docs/` (tracked) rather than root (ignored). |
 | `vision.md` | **Heavy reframe.** Executive summary opens with the two-axis grid; new `Axis A` / `Axis B` sibling sections; new `Enterprise context` section (~250 words for a reader without a corporate-data background); `Where this sits in the world` replaces the old portfolio-pitch framing. Guiding principles preserved verbatim, plus a new principle: **"Two axes, independent merges."** |
 | `development_plan.md` | **Updated.** Renamed `Forward roadmap — tiered deliverables` → `Axis A — Infra / Orchestration (L1–L4)`. Added `Axis B — AI Workflow Engineering` with 8 sub-stages each carrying scope / new files / pattern source / exit criteria. Added `Merge-request grid` section with an example-cell table and a recommended initial queue. Tech-stack table extended with agent-design-pattern / join-inference / replanning / provenance rows. New `Verification per Axis B stage` section. |
 
@@ -156,7 +156,7 @@ roadmap restructure:
 
 2. **Heavy reframe of `vision.md` (per user choice).** Executive summary opens with the two-axis grid; existing problem / architecture content becomes supporting sections. Enterprise context promoted into `vision.md` (~250 words) so the headline doc explains *why* enterprise constraints shape Axis B3.4 — provenance, audit trail, sanity bounds, semantic-layer hook — rather than relegating that justification to the development plan.
 
-3. **Frontier research lives in a separate dated file.** `frontier_research_2026-05.md` is a point-in-time snapshot, not a living doc; refresh next time work resumes substantially later than this. Keeps `vision.md` and `development_plan.md` focused on design.
+3. **Frontier research lives in a separate dated file under `docs/`.** `docs/frontier_research_2026-05.md` is a point-in-time snapshot rather than a living doc; it should be refreshed and re-dated next time work resumes substantially later than this. Keeps `vision.md` and `development_plan.md` focused on design while leaving the supporting evidence tracked for reviewers.
 
 4. **Old plan demoted to footnotes.** `development_plan_old.md` and `vision_old.md` remain in tree but are referenced only when discussing dropped features (Plotly support, full 9-defect taxonomy, multi-chart dashboard composition).
 
@@ -178,7 +178,7 @@ roadmap restructure:
 - **L1 implementation** (Axis A tier-1 × Axis B B1.1 + B1.2) — the immediate next entry in this log.
 - **Future Axis B work** — B2/B3 modules now have concrete scope, exit criteria, and pattern sources rooted in the frontier-research snapshot.
 
-**Packages:** docs only (`vision.md`, `development_plan.md`, `feature_list.md`, `frontier_research_2026-05.md`).
+**Packages:** docs only (`vision.md`, `development_plan.md`, `docs/frontier_research_2026-05.md`; plus uncommitted scratch `feature_list.md`).
 
 ## 2026-02-09: MVP.7 Inspector Foundation (Geometric Defect Detection)
 

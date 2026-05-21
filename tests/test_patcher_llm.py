@@ -4,7 +4,7 @@ NOTE on the "production gap": in L1 the two checked defect types
 (label_overlap, element_cutoff) both have registered deterministic recipes,
 so the dispatcher never routes to the LLM patcher in normal operation.
 These tests deliberately construct scenarios that exercise the LLM path
-(by passing an Issue with whose defect_type has no recipe, or by injecting
+(by passing an Issue whose defect_type has no recipe, or by injecting
 a MockLLMClient) so the scaffold is verified end-to-end.
 """
 

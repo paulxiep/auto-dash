@@ -79,12 +79,18 @@ class PNGWriter:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         files: list[Path] = []
+        formats: list[OutputFormat] = []
 
+        # The PNG is the writer's namesake artifact. The .py file is
+        # auxiliary (the patched source that produced it); we still emit it
+        # for traceability even when no PNG was captured (e.g. render error),
+        # but only the actually-written PNG counts toward `formats`.
         png_bytes = state.get("png_bytes")
         if png_bytes:
             png_path = output_dir / f"{name}.png"
             png_path.write_bytes(png_bytes)
             files.append(png_path)
+            formats.append(OutputFormat.PNG)
 
         code = state.get("source_code")
         if code:
@@ -92,7 +98,7 @@ class PNGWriter:
             code_path.write_text(code, encoding="utf-8")
             files.append(code_path)
 
-        return OutputResult(files_written=files, formats=[OutputFormat.PNG])
+        return OutputResult(files_written=files, formats=formats)
 
 
 # --- JSON report writer ---

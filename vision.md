@@ -37,7 +37,7 @@ $ autodash orders.csv customers.csv products.csv "Which regions grew Q4 revenue 
 
 ## Why this matters
 
-**Programmatic chart-quality measurement is unfilled territory.** Today's LLM chart-fixing either does nothing (you ask "fix the labels," paste the screenshot back into the chat) or invokes a vision-language model on every iteration (slow, expensive, non-deterministic). The frontier-research audit confirms there is no shipped open-source library that detects chart defects from rendered geometry and applies known mechanical fixes deterministically. plotlint is that library. See [frontier_research_2026-05.md](frontier_research_2026-05.md) §7.
+**Programmatic chart-quality measurement is unfilled territory.** Today's LLM chart-fixing either does nothing (you ask "fix the labels," paste the screenshot back into the chat) or invokes a vision-language model on every iteration (slow, expensive, non-deterministic). The frontier-research audit confirms there is no shipped open-source library that detects chart defects from rendered geometry and applies known mechanical fixes deterministically. plotlint is that library. See [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §7.
 
 **Un-modelled multi-CSV question-answering is also unfilled.** Every shipping AI data tool either:
 
@@ -45,7 +45,7 @@ $ autodash orders.csv customers.csv products.csv "Which regions grew Q4 revenue 
 - defers joins back to the user (ChatGPT Advanced Data Analysis, Julius AI, Cursor with data), or
 - works only on a single file or dataframe (PandasAI, Microsoft LIDA).
 
-An agent that accepts several un-modelled CSVs, infers joins, validates them, replans on failure, tracks provenance, and asks the user clarifying questions when joins are ambiguous is the AI-workflow-engineering target of Axis B. See [frontier_research_2026-05.md](frontier_research_2026-05.md) §3 for the per-product landscape audit.
+An agent that accepts several un-modelled CSVs, infers joins, validates them, replans on failure, tracks provenance, and asks the user clarifying questions when joins are ambiguous is the AI-workflow-engineering target of Axis B. See [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §3 for the per-product landscape audit.
 
 ### The fixes-interact problem (plotlint's specific framing)
 
@@ -175,7 +175,7 @@ Each phase decomposes into MR-shippable sub-stages:
 - **B3.3** — Iterative replanning + user clarification escalation
 - **B3.4** — Enterprise hardening of the multi-CSV agent (audit trail, sanity bounds, semantic-layer hook)
 
-Full per-stage scope, files, and exit criteria live in [development_plan.md](development_plan.md) under "Axis B — AI Workflow Engineering". The landscape and methodology choices underlying these phases are sourced from [frontier_research_2026-05.md](frontier_research_2026-05.md).
+Full per-stage scope, files, and exit criteria live in [development_plan.md](development_plan.md) under "Axis B — AI Workflow Engineering". The landscape and methodology choices underlying these phases are sourced from [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md).
 
 ---
 
@@ -189,13 +189,13 @@ The recurring pain points enterprises report (sourced from blog posts, customer 
 
 The implication for this project: for the multi-CSV agent in Axis B3 to be more than a demo, it has to **track provenance from day one, surface its assumptions, expose an audit log, and have a clear escalation protocol when it isn't sure**. Those aren't enterprise-sales features — they are the basic forcing functions any agent operating on data anyone cares about will need. They land formally in B3.4 (enterprise hardening of the multi-CSV agent).
 
-See [frontier_research_2026-05.md](frontier_research_2026-05.md) §1 for the layperson primer on enterprise data roles, BI tools, semantic layers, and governance terminology; §2 for the full adoption picture; §2.7 for the non-negotiables list that shapes B3.4.
+See [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §1 for the layperson primer on enterprise data roles, BI tools, semantic layers, and governance terminology; §2 for the full adoption picture; §2.7 for the non-negotiables list that shapes B3.4.
 
 ---
 
 ## Where this sits in the world
 
-Plain-English summary of the frontier-research conclusions per Axis B phase. Citations in [frontier_research_2026-05.md](frontier_research_2026-05.md).
+Plain-English summary of the frontier-research conclusions per Axis B phase. Citations in [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md).
 
 - **plotlint (Axis B1).** No shipped equivalent. The closest adjacent prior art is `vislint_mpl` (research code, detection only), Chartability (an accessibility checklist designed for humans to use), matplotlib's built-in `tight_layout` / `constrained_layout` (handles spacing only, not element-level overlap or palette safety), and recent VLM-based chart-critique research papers from 2024–2026 (skip mechanical fixes entirely and go straight to LLM). The hybrid "deterministic mechanical fixes + LLM semantic fallback" library does not exist yet. Genuine gap.
 
@@ -263,5 +263,5 @@ The Axis B components do not exist yet; they are what the Axis B development pla
 ---
 
 See [development_plan.md](development_plan.md) for the per-tier and per-stage roadmap with exit criteria and the merge-request grid.
-See [frontier_research_2026-05.md](frontier_research_2026-05.md) for the landscape audit underlying Axis B.
+See [docs/executive_summary.md](docs/executive_summary.md) for a portfolio-level overview, [docs/technical_summary.md](docs/technical_summary.md) for the engineer-level walkthrough, and [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) for the landscape audit underlying Axis B.
 See [architecture.md](architecture.md) for normative module/package boundaries (still authoritative for already-built components; will need extension for Axis B modules in a later round).

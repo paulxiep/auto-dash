@@ -6,7 +6,7 @@ This plan covers two orthogonal axes:
 - **Axis A — Infra / Orchestration** (L1–L4): *how* the system runs.
 - **Axis B — AI Workflow Engineering** (B1–B3): *what* the system is intelligent about.
 
-Each merge request lands one (Axis A tier, Axis B stage) cell. The two axes advance independently. See [vision.md](vision.md) for the two-axis framing and [frontier_research_2026-05.md](frontier_research_2026-05.md) for the landscape audit underlying Axis B.
+Each merge request lands one (Axis A tier, Axis B stage) cell. The two axes advance independently. See [vision.md](vision.md) for the two-axis framing and [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) for the landscape audit underlying Axis B.
 
 ---
 
@@ -153,11 +153,11 @@ Total Axis A full path: ~3–4 weeks. Partial-path stopping points are coherent 
 
 The infra axis above describes *how* the system is deployed. This axis describes *what* the system is intelligent about. Each phase below ships AI-workflow capabilities orthogonal to the infra axis — B-stage advances can land in any L-tier.
 
-Source for landscape and methodology choices: [frontier_research_2026-05.md](frontier_research_2026-05.md). The design questions surfaced in [feature_list.md](feature_list.md) §6 are formalised here.
+Source for landscape and methodology choices: [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md). The two design questions formalised in this section — the two-track patcher (B1) and the multi-CSV agent (B3) — were surfaced during the 2026-05 post-pause rescope.
 
 ### B1 — Chart patcher track (~1 week total)
 
-Closes plotlint's fix loop with the explicit two-track structure flagged in [feature_list.md](feature_list.md) §6.1: a deterministic fast path for mechanical defects, with the LLM patcher reserved as fallback for semantic defects. Replaces the originally monolithic MVP.8 design.
+Closes plotlint's fix loop with an explicit two-track structure: a deterministic fast path for mechanical defects, with the LLM patcher reserved as fallback for semantic defects. Replaces the originally monolithic MVP.8 design.
 
 #### B1.1 — Deterministic mechanical-defect patcher (~3 days)
 
@@ -197,7 +197,7 @@ Closes plotlint's fix loop with the explicit two-track structure flagged in [fea
 
 ### B2 — Single-CSV agent maturity (~1 week total)
 
-Apply research-agent design patterns (see [frontier_research_2026-05.md](frontier_research_2026-05.md) §6) to the existing single-CSV pipeline (MVP.2–6, already built). Closes the gap between "small agent" and "real agent."
+Apply research-agent design patterns (see [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §6) to the existing single-CSV pipeline (MVP.2–6, already built). Closes the gap between "small agent" and "real agent."
 
 #### B2.1 — Orchestrator-worker + scratchpad refactor (~3 days)
 
@@ -228,7 +228,7 @@ Existing per-step modules (`planner.py`, `explorer.py`, `charts.py`) become work
 
 ### B3 — Multi-CSV agent (~3–4 weeks total)
 
-The headline AI-workflow capability. Lands the project in the underbuilt area identified in [feature_list.md](feature_list.md) §6.2 and confirmed by [frontier_research_2026-05.md](frontier_research_2026-05.md) §3.
+The headline AI-workflow capability. Lands the project in the underbuilt area confirmed by [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §3 — no shipping product autonomously infers joins from raw un-modelled CSVs.
 
 #### B3.1 — Multi-file profiling + question routing (~3 days)
 
@@ -243,7 +243,7 @@ The headline AI-workflow capability. Lands the project in the underbuilt area id
 
 **Scope.** Propose join keys via name overlap + type overlap + sampled value-set overlap. Optional LLM-as-judge ranks ambiguous candidates. Validate joins: row-count plausibility, null-rate post-join, type integrity, sample spot-check. One join attempt per question; report what was joined and why with a confidence score.
 
-**Pattern source:** HyperJoin (LLM-augmented hypergraph join discovery, +21% Precision@15), Magneto (hybrid small+large LLM schema matching), Snoopy (semantic join discovery via proxy columns) — see [frontier_research_2026-05.md](frontier_research_2026-05.md) §4.
+**Pattern source:** HyperJoin (LLM-augmented hypergraph join discovery, +21% Precision@15), Magneto (hybrid small+large LLM schema matching), Snoopy (semantic join discovery via proxy columns) — see [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §4.
 
 **New files:**
 - `autodash/join_inference.py` — candidate-key proposal
@@ -257,7 +257,7 @@ The worker pattern from B2.1 is used for parallel candidate-key validation.
 
 **Scope.** Reflexion-style memory: if a join fails (0 rows, type mismatch, implausible row-count explosion), record why; propose alternative paths. Bounded retry budget (max 2–3 replans). Orchestrator-worker dispatches parallel hypothesis testing on candidate join paths. Confidence-thresholded escalation: when the top hypotheses score within a threshold of each other, surface a clarification question to the user with ranked options and evidence.
 
-**Pattern source:** Reflexion (linguistic-feedback memory loop); Anthropic multi-agent research system (orchestrator-worker with parallel subagents); research-agent stop-criteria-and-escalate pattern — see [frontier_research_2026-05.md](frontier_research_2026-05.md) §6.
+**Pattern source:** Reflexion (linguistic-feedback memory loop); Anthropic multi-agent research system (orchestrator-worker with parallel subagents); research-agent stop-criteria-and-escalate pattern — see [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §6.
 
 **New files:**
 - `autodash/replanner.py` — Reflexion-style memory + bounded retry
@@ -267,7 +267,7 @@ The worker pattern from B2.1 is used for parallel candidate-key validation.
 
 #### B3.4 — Enterprise hardening of the multi-CSV agent (~1 week)
 
-**Scope.** Drive the non-negotiables surfaced in [frontier_research_2026-05.md](frontier_research_2026-05.md) §2.7:
+**Scope.** Drive the non-negotiables surfaced in [docs/frontier_research_2026-05.md](docs/frontier_research_2026-05.md) §2.7:
 
 - **Provenance audit trail.** Every step logged with timestamp, model, tools, input/output hashes. Exportable as JSON.
 - **Sanity bounds.** Configurable assertions (e.g. "post-join row count should be within X% of input"); fail loud rather than silently producing wrong numbers.

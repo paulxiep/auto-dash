@@ -35,7 +35,7 @@ The originally scoped roadmap had three remaining MVP milestones after MVP.7. L1
 
 | Original Milestone | Original Scope | L1 Delivery | Status |
 |---|---|---|---|
-| **MVP.8 — Patcher** | LLM fix generation, one issue per iteration. Single LLM patcher. | `PatchDispatcher` routes deterministic-first / LLM-fallback. `DeterministicPatcher` consults a `FixRecipe` registry; `LLMPatcher` only fires when no recipe applies or all are exhausted. Reframe documented in [feature_list.md](../feature_list.md) §6.1 (when present). | **Shipped** as L1 × B1.1 + B1.2 |
+| **MVP.8 — Patcher** | LLM fix generation, one issue per iteration. Single LLM patcher. | `PatchDispatcher` routes deterministic-first / LLM-fallback. `DeterministicPatcher` consults a `FixRecipe` registry; `LLMPatcher` only fires when no recipe applies or all are exhausted. The two-track reframe was surfaced during the 2026-05 post-pause rescope before MVP.8 was built. | **Shipped** as L1 × B1.1 + B1.2 |
 | **MVP.9 — Output** | Chart PNG writer. | `OutputWriter` protocol + `PNGWriter` (final PNG + re-runnable Python) + `JSONReportWriter` (score trajectory + fix history + final issues + final code) + registry / factory. | **Shipped** as L1 supporting |
 | **MVP.10 — Packaging** | Docker / installable CLI. | Editable `pip install -e .[dev]`; `python examples/broken_chart_demo.py` is the user entry point. Standalone `plotlint` / `autodash` CLI deferred to PL-1.4; Docker sandbox deferred to PL-3.1. | **Deferred** |
 
@@ -289,4 +289,4 @@ Recommended next-queue cells (see [development_plan.md](../development_plan.md) 
 
 MVP.10 (Docker / CLI packaging) is not in this queue — deferred to PL-1.4 (CLI) and PL-3.1 (Docker sandbox) per architecture.md extension points. The demo script `python examples/broken_chart_demo.py` is the current entry point and does not require packaging to demonstrate the full L1 surface.
 
-See [frontier_research_2026-05.md](../frontier_research_2026-05.md) (when present) for the landscape audit and methodology choices underlying Axis B.
+See [frontier_research_2026-05.md](frontier_research_2026-05.md) for the landscape audit and methodology choices underlying Axis B.

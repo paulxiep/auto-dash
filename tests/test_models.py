@@ -92,6 +92,32 @@ class TestFixAttempt:
         )
         assert not fix.improved
 
+    def test_pending_score_after_is_not_improved(self):
+        """A freshly-constructed FixAttempt (pre-inspect_node finalisation)
+        has score_after=None and must report improved=False without crashing."""
+        fix = FixAttempt(
+            iteration=1,
+            target_issue=DefectType.LABEL_OVERLAP,
+            description="just patched, not yet measured",
+            code_hash="abc",
+            score_before=0.5,
+        )
+        assert fix.score_after is None
+        assert fix.improved is False
+        assert fix.is_finalised is False
+
+    def test_finalised_property(self):
+        pending = FixAttempt(
+            iteration=1, target_issue=DefectType.LABEL_OVERLAP,
+            description="d", code_hash="h", score_before=0.5,
+        )
+        finalised = FixAttempt(
+            iteration=1, target_issue=DefectType.LABEL_OVERLAP,
+            description="d", code_hash="h", score_before=0.5, score_after=0.5,
+        )
+        assert not pending.is_finalised
+        assert finalised.is_finalised
+
 
 class TestRenderResult:
     def test_succeeded(self):

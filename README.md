@@ -4,11 +4,10 @@ An end-to-end pipeline: data tables + natural-language questions → polished, m
 
 The roadmap runs on two orthogonal axes — **Axis A** (Infra / Orchestration, L1–L4) and **Axis B** (AI Workflow Engineering, B1–B3). Each merge request lands one (A-tier, B-stage) cell. L1 × B1.1 + L1 × B1.2 shipped 2026-05-20.
 
-- [Executive Summary](docs/executive_summary.md)
-- [Technical Summary](docs/technical_summary.md)
-- [Project Vision](vision.md)
-- [Architecture](architecture.md)
+- [Executive Summary](docs/executive_summary.md) · [Technical Summary](docs/technical_summary.md)
+- [Project Vision](vision.md) · [Architecture](architecture.md)
 - [Development Plan](development_plan.md) · [Development Log](development_log.md)
+- [Frontier Research (2026-05)](docs/frontier_research_2026-05.md)
 
 ## Usage
 
@@ -48,7 +47,7 @@ $ plotlint broken_chart.py
 
 ### Forward — two orthogonal axes (see [development_plan.md](development_plan.md))
 
-The roadmap is a grid: **Axis A — Infra / Orchestration** progresses how the system runs (L1 standalone library → L2 local pipeline → L3 Bedrock AgentCore → L4 enterprise hardening with Step Functions, Bedrock Guardrails, OpenTelemetry, and a CI eval harness). **Axis B — AI Workflow Engineering** progresses what the system is intelligent about (B1 chart patcher complete → B2 single-CSV agent maturity with orchestrator-worker + scratchpad + validation + provenance → B3 multi-CSV agent with join inference, iterative replanning, user clarification, and enterprise-grade audit trail). Each merge request lands one (A-tier, B-stage) cell; work stops cleanly at any cell. The headline next-up step in [development_plan.md](development_plan.md)'s recommended queue is **L2 × B2.1** (local pipeline with orchestrator-worker single-CSV agent), with **L2 × B3.2** (multi-CSV with join inference) as the first publishable AI-agent demo. The frontier-research backing for Axis B is in [frontier_research_2026-05.md](frontier_research_2026-05.md).
+The roadmap is a grid: **Axis A — Infra / Orchestration** progresses how the system runs (L1 standalone library → L2 local pipeline → L3 Bedrock AgentCore → L4 enterprise hardening with Step Functions, Bedrock Guardrails, OpenTelemetry, and a CI eval harness). **Axis B — AI Workflow Engineering** progresses what the system is intelligent about (B1 chart patcher complete → B2 single-CSV agent maturity with orchestrator-worker + scratchpad + validation + provenance → B3 multi-CSV agent with join inference, iterative replanning, user clarification, and enterprise-grade audit trail). Each merge request lands one (A-tier, B-stage) cell; work stops cleanly at any cell. The headline next-up step in [development_plan.md](development_plan.md)'s recommended queue is **L2 × B2.1** (local pipeline with orchestrator-worker single-CSV agent), with **L2 × B3.2** (multi-CSV with join inference) as the first publishable AI-agent demo.
 
 ## Purpose
 

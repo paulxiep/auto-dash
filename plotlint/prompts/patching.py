@@ -78,8 +78,12 @@ def build_user_prompt(
 def _format_history(fix_history: list[FixAttempt]) -> str:
     if not fix_history:
         return "(none — this is the first attempt)"
+
+    def _fmt_after(fa: FixAttempt) -> str:
+        return f"{fa.score_after:.2f}" if fa.score_after is not None else "pending"
+
     return "\n".join(
         f"- iter {fa.iteration} | {fa.target_issue.value} | "
-        f"{fa.description} | score {fa.score_before:.2f} -> {fa.score_after:.2f}"
+        f"{fa.description} | score {fa.score_before:.2f} -> {_fmt_after(fa)}"
         for fa in fix_history
     )

@@ -9,6 +9,7 @@ Graph topology:
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 from typing import Any, Optional
 
 from langgraph.graph import StateGraph, START, END
@@ -17,6 +18,26 @@ from langgraph.graph.state import CompiledStateGraph
 from plotlint.config import ConvergenceConfig
 from plotlint.models import ConvergenceState, FixAttempt
 from plotlint.renderer import Renderer
+
+
+def _finalise_pending_fix(
+    fix_history: list[FixAttempt],
+    score_after: float,
+) -> list[FixAttempt]:
+    """Return a new fix_history with the trailing FixAttempt finalised.
+
+    If the most recent FixAttempt has score_after=None (a fix that was applied
+    but not yet measured), replace it with a copy that records the freshly
+    measured post-patch score. Otherwise return the input unchanged.
+
+    Defensive: never mutates the input list; LangGraph state semantics rely
+    on returning fresh values from each node.
+    """
+    if not fix_history or fix_history[-1].is_finalised:
+        return list(fix_history)
+    updated = list(fix_history)
+    updated[-1] = dataclasses.replace(updated[-1], score_after=score_after)
+    return updated
 
 
 def _make_render_node(renderer: Renderer):
@@ -44,8 +65,14 @@ def _make_render_node(renderer: Renderer):
                 "figure_pickle": result.figure_data,
                 "render_error": None,
             }
+        # Render failed: clear any stale figure_pickle / png_bytes from a
+        # previous successful iteration so inspect_node can't process them.
+        # Without this, LangGraph's state merge preserves the prior figure
+        # and inspect_node would happily overwrite render_error back to None.
         return {
             "iteration": next_iteration,
+            "png_bytes": None,
+            "figure_pickle": None,
             "render_error": result.error_message
             or f"Render failed: {result.status.value}",
         }
@@ -62,13 +89,15 @@ def _make_inspect_node(extractor):
     async def inspect_node(state: ConvergenceState) -> dict:
         """Run Inspector on rendered figure.
 
-        Reads: figure_pickle (from render_node)
-        Writes: inspection, score, score_history (appended), render_error (if extraction fails)
+        Reads: figure_pickle (from render_node), fix_history
+        Writes: inspection, score, score_history (appended), fix_history
+                (finalises trailing FixAttempt), render_error (if extraction fails)
         """
         from plotlint.inspector import inspect_from_figure
         from plotlint.core.errors import ExtractionError
 
         score_history = list(state.get("score_history", []))
+        fix_history: list[FixAttempt] = list(state.get("fix_history", []))
 
         figure_data = state.get("figure_pickle")
         if not figure_data:
@@ -77,6 +106,9 @@ def _make_inspect_node(extractor):
                 "render_error": "No figure data to inspect",
                 "score": 0.0,
                 "score_history": score_history,
+                # Finalise the pending fix (if any) with the failure score
+                # so the history doesn't carry an unbounded pending entry.
+                "fix_history": _finalise_pending_fix(fix_history, 0.0),
             }
 
         try:
@@ -88,6 +120,7 @@ def _make_inspect_node(extractor):
                 "inspection": inspection,
                 "score": inspection.score,
                 "score_history": score_history,
+                "fix_history": _finalise_pending_fix(fix_history, inspection.score),
                 "render_error": None,
             }
         except ExtractionError as e:
@@ -96,6 +129,7 @@ def _make_inspect_node(extractor):
                 "render_error": f"Extraction failed: {str(e)}",
                 "score": 0.0,
                 "score_history": score_history,
+                "fix_history": _finalise_pending_fix(fix_history, 0.0),
             }
 
     return inspect_node
@@ -125,21 +159,26 @@ def _make_patch_node(patcher):
         result = await patcher.patch(code, inspection, fix_history)
 
         if result is None:
+            # Use stop_reason rather than render_error: the latter is cleared
+            # by a subsequent successful render_node, which would let the loop
+            # continue patching the same failing issue until stagnation.
+            # stop_reason is only set here and only read by should_continue.
             return {
                 "patch_applied": False,
-                "render_error": (
+                "stop_reason": (
                     "Patcher exhausted: no recipe applies and LLM patcher "
                     "is unavailable or returned no fix."
                 ),
             }
 
+        # score_after is left as None; inspect_node finalises it on the
+        # next pass once the post-patch render has been measured.
         fix_history.append(FixAttempt(
             iteration=state.get("iteration", 0),
             target_issue=result.target_issue,
             description=result.description,
             code_hash=result.code_hash,
             score_before=score_before,
-            score_after=score_before,  # updated on next inspect_node
             recipe_id=result.recipe_id,
         ))
 
@@ -179,12 +218,14 @@ def _make_should_continue(config: ConvergenceConfig):
         1. score >= target_score (perfect)
         2. iteration >= max_iterations
         3. render_error is set (code doesn't execute)
-        4. score stagnant for stagnation_window iterations
+        4. stop_reason is set (patch_node exhausted; persistent signal)
+        5. score stagnant for stagnation_window iterations
         """
         score = state.get("score", 0.0)
         iteration = state.get("iteration", 0)
         max_iterations = state.get("max_iterations", config.max_iterations)
         render_error = state.get("render_error")
+        stop_reason = state.get("stop_reason")
         score_history = state.get("score_history", [])
 
         # 1. Perfect score
@@ -199,7 +240,11 @@ def _make_should_continue(config: ConvergenceConfig):
         if render_error is not None:
             return "stop"
 
-        # 4. Score stagnation
+        # 4. Patcher exhaustion (set by patch_node; persistent)
+        if stop_reason is not None:
+            return "stop"
+
+        # 5. Score stagnation
         if len(score_history) >= config.stagnation_window:
             recent = score_history[-config.stagnation_window :]
             if len(recent) >= 2:
