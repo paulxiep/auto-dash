@@ -96,7 +96,7 @@ class InspectionResult:
 class FixAttempt:
     """Record of a single patch attempt.
 
-    Used for history tracking and deduplication (PL-1.2).
+    Used for history tracking and deduplication.
     """
 
     iteration: int
@@ -105,10 +105,27 @@ class FixAttempt:
     code_hash: str
     score_before: float
     score_after: float
+    recipe_id: Optional[str] = None  # set for deterministic patches; None for LLM
 
     @property
     def improved(self) -> bool:
         return self.score_after > self.score_before
+
+
+@dataclass(frozen=True)
+class PatchResult:
+    """Output of a single successful patch attempt.
+
+    Emitted by both DeterministicPatcher (via a FixRecipe) and LLMPatcher.
+    Communication contract between the patcher modules and the convergence loop.
+    """
+
+    patched_code: str
+    code_hash: str                  # sha256 of patched_code; for dedup + FixAttempt
+    target_issue: DefectType
+    description: str                # human-readable: "Rotated x-axis labels 45°"
+    used_llm: bool
+    recipe_id: Optional[str] = None  # set for deterministic; None for LLM
 
 
 @dataclass(frozen=True)

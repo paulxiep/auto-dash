@@ -122,7 +122,13 @@ class MatplotlibExtractor:
     def _extract_tick_labels(
         self, ax, renderer, fig_height: float, ax_idx: int, axis: str,
     ) -> list[ElementInfo]:
-        """Extract tick label elements for one axis."""
+        """Extract tick label elements for one axis.
+
+        Captures rotation angle in metadata so checks can adjust their
+        heuristics — e.g. LabelOverlapCheck skips AABB-based collision when
+        labels are rotated, because the AABB after rotation overstates the
+        actual visual footprint.
+        """
         axis_obj = ax.xaxis if axis == "x" else ax.yaxis
         labels = axis_obj.get_ticklabels()
         results = []
@@ -135,13 +141,18 @@ class MatplotlibExtractor:
                 mpl_bbox = label.get_window_extent(renderer)
                 bbox = self._mpl_to_bbox(mpl_bbox, fig_height)
                 if bbox.area > 0:
+                    rotation = float(label.get_rotation() or 0.0)
                     results.append(ElementInfo(
                         element_id=f"axes.{ax_idx}.{axis}axis.tick.{i}",
                         category=ElementCategory.TICK_LABEL,
                         bbox=bbox,
                         text=text,
                         axis_index=ax_idx,
-                        metadata={"axis": axis, "tick_index": i},
+                        metadata={
+                            "axis": axis,
+                            "tick_index": i,
+                            "rotation": rotation,
+                        },
                     ))
             except Exception:
                 # Skip labels that fail to get extent (e.g., malformed artists)

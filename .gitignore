@@ -62,3 +62,14 @@ desktop.ini
 
 # --- Claude Code local workspace ---
 .claude/
+
+# --- Root-level .md whitelist ---
+# Root .md files default to ignored so strategy / scratch docs don't get
+# accidentally committed. Subdirectory .md files (docs/, prompts/, fixtures/,
+# infra docs/) remain tracked. Use docs/ for new long-form documents.
+/*.md
+!/README.md
+!/development_log.md
+!/development_plan.md
+!/vision.md
+!/architecture.md

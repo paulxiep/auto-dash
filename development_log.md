@@ -1,5 +1,185 @@
 # Development Log
 
+## 2026-05-20: L1 — Close the convergence loop (B1.1 deterministic patcher + B1.2 LLM patcher scaffold)
+
+### Summary
+
+**L1 delivers the originally scoped MVP.8 (Patcher) and MVP.9 (Output).** MVP.8 is reframed from a single LLM patcher (the original spec) into a two-track dispatcher (`PatchDispatcher`) routing deterministic-first / LLM-fallback — the deterministic half is B1.1, the LLM half is B1.2. MVP.9 is `PNGWriter` + `JSONReportWriter`. MVP.10 (Docker / installable CLI packaging) is deferred to PL-1.4 (CLI) and PL-3.1 (Docker sandbox); `python examples/broken_chart_demo.py` is the L1 entry point.
+
+Built the deterministic patcher (B1.1) with a `FixRecipe` protocol + decorator-based registry, four mechanical-fix recipes (`rotate_x_labels`, `shrink_x_tick_font`, `add_tight_layout`, `enlarge_figure`), and a `DeterministicPatcher` that dispatches recipes with `(defect_type, recipe_id)` dedup against `fix_history`. Scaffolded the LLM patcher fallback (B1.2) with prompt templates, an `LLMPatcher`, and a `PatchDispatcher` that routes deterministic-first / LLM-fallback by recipe-registry presence. Built two output writers (`PNGWriter`, `JSONReportWriter`) and an end-to-end demo (`examples/broken_chart_demo.py`). Fixed two pre-existing latent bugs in `loop.py` (`iteration` was never incremented; `score_history` was never appended) that the stub `patch_node` had masked. Made `LabelOverlapCheck` rotation-aware so rotated labels are not over-flagged on AABB after the rotate recipe runs. Added `matplotlib` to project dependencies (was missing; previously worked only via miniconda's bundled matplotlib). 434 tests passing.
+
+### Architecture
+
+```
+convergence loop (post-L1):
+  render → inspect → decide ─┬─ "patch" → patch_node ─┐
+                             │                         │
+                             └─ "stop" → END           │
+                                                       ▼
+  patch_node calls PatchDispatcher.patch(code, inspection, fix_history)
+    └─> DeterministicPatcher.patch    ← recipe registry lookup; dedup
+          └─> FixRecipe.apply(code, issue) → patched code string
+    └─> LLMPatcher.patch (fallback)   ← only when no recipe / all exhausted
+          └─> prompts/patching.py → LLMClient.complete → parse_code_from_response
+
+  loop returns to render with patched source_code;
+  iteration++; score_history.append(score);
+  fix_history grows by one FixAttempt per patch applied
+```
+
+### New / Modified Files
+
+| File | Purpose |
+|---|---|
+| `plotlint/fix_recipes/__init__.py` | **New.** `FixRecipe` protocol, `@recipe(defect_type)` decorator, `_RECIPES` registry, `get_recipes_for`, `clear_registry` (test helper). Explicit-imports tail mirrors the pattern in `plotlint/checks/__init__.py`. |
+| `plotlint/fix_recipes/overlap.py` | **New.** `RotateXLabelsRecipe` (primary), `ShrinkXTickFontRecipe` (secondary). Inject `tick_params(axis='x', rotation=45)` / `labelsize=8` + `tight_layout()` at end of code. Axis index parsed from `Issue.element_ids` so multi-axes charts dispatch correctly. |
+| `plotlint/fix_recipes/cutoff.py` | **New.** `AddTightLayoutRecipe` (primary), `EnlargeFigureRecipe` (secondary, scales figure 25%). |
+| `plotlint/patcher_deterministic.py` | **New.** `DeterministicPatcher.patch(code, issue, fix_history) → Optional[PatchResult]`. Returns None when no recipe applies or all are exhausted — signals fallback to LLM. |
+| `plotlint/patcher_llm.py` | **New.** `LLMPatcher` — fallback that prompts the LLM with code + issue + history; parses with `parse_code_from_response`. Returns None on `LLMError` or unparseable response. Module docstring documents the "no production defect type exercises this in L1" gap. |
+| `plotlint/patcher.py` | **New.** `PatchDispatcher` — single source of truth for routing. Deterministic first; LLM optional and only invoked when deterministic returns None. |
+| `plotlint/prompts/patching.py` | **New.** `SYSTEM_PROMPT` + per-renderer user template; `build_user_prompt(renderer_type, code, issue, fix_history)`. `KeyError` on unknown renderer surfaces missing template loudly. |
+| `plotlint/output.py` | **New.** `OutputWriter` protocol, `PNGWriter` (writes `<name>.png` + `<name>.py`), `JSONReportWriter` (writes `<name>_report.json`), registry + `register_writer` / `get_writer`. |
+| `plotlint/models.py` | **Modified.** Added `PatchResult` frozen dataclass (patched_code, code_hash, target_issue, description, used_llm, recipe_id). Added `recipe_id` field to `FixAttempt`. |
+| `plotlint/loop.py` | **Modified.** `render_node` now increments `iteration` before rendering (Off-1 fix, architecture.md §12.5). `inspect_node` appends to `score_history` after computing score (Off-1 fix). `_make_patch_node(dispatcher)` factory wraps the real dispatcher; `patch_node` was previously a stub returning `{}`. `build_convergence_graph(patcher=...)` accepts a dispatcher. |
+| `plotlint/core/llm.py` | **Modified.** Default model `claude-sonnet-4-5-20250929` → `claude-sonnet-4-6`. |
+| `plotlint/extractors/matplotlib.py` | **Modified.** Capture `label.get_rotation()` in element metadata so checks can branch on it. |
+| `plotlint/checks/overlap.py` | **Modified.** Skip AABB collision test when both adjacent labels are rotated ≥15°. Made the `rotate_x_labels` recipe actually resolve overlap as measured. |
+| `pyproject.toml` | **Modified.** Added `matplotlib>=3.9` to core dependencies. Previously worked only because miniconda bundles matplotlib; a fresh `.venv` install would have failed at import time. |
+| `tests/test_renderer.py` | **Modified.** Fixed stale `bundle.extractor is None  # Until MVP.7` assertion (MVP.7 was already built; assertion was pre-existing). |
+| `examples/broken_chart_demo.py` | **New.** End-to-end demo — two broken charts (overlap, cutoff) → loop → 8 output files under `examples/output/`. Runs without `ANTHROPIC_API_KEY`. |
+| `tests/test_loop_iteration_increments.py` | **New.** 7 regression tests for Off-1 fix. |
+| `tests/test_fix_recipes_{registry,overlap,cutoff}.py` | **New.** 31 tests: registry decorator + protocol conformance + per-recipe applicability and code-emission. |
+| `tests/test_patcher_{deterministic,llm,dispatcher}.py` | **New.** 17 tests across the three patcher modules including the "noted gap" LLM-fallback path (forces fallback via `clear_registry()` monkeypatch). |
+| `tests/test_output_{png,json}.py` | **New.** 10 writer tests. |
+| `tests/test_loop_e2e_real_recipes.py` | **New.** 5 e2e tests with real renderer + real recipes; covers termination-within-budget and dedup contract. |
+
+### Two-Track Patcher Dispatch
+
+`PatchDispatcher.patch(code, inspection, fix_history)`:
+
+1. `issue = inspection.highest_severity_issue` — None → return None.
+2. `result = deterministic.patch(code, issue, fix_history)`:
+   - `recipes = get_recipes_for(issue.defect_type)` (returns `[]` for un-recipe'd defect types)
+   - filter out `(defect_type, recipe_id)` pairs already in `fix_history`
+   - filter out recipes whose `can_apply(issue, code)` returns False (e.g. `RotateXLabelsRecipe` rejects y-axis overlap)
+   - return `PatchResult` from the first remaining recipe, in registration order
+   - return None when no recipe remains → signals fallback
+3. If `result is None` and `llm is not None`: `result = await llm.patch(code, issue, fix_history)`
+4. Return `result` (or None).
+
+### Key Design Decisions
+
+1. **Two-track patcher: deterministic-first, LLM fallback.** Dispatcher routes by recipe-registry presence: `DefectType` with a registered recipe → `DeterministicPatcher`; otherwise → `LLMPatcher`. Cheaper, faster, fully reproducible for mechanical defects; LLM reserved for semantic / long-tail defects. Matches the two-track strategy surfaced in [feature_list.md](feature_list.md) §6.1.
+
+2. **B1.2 scaffolded with documented "no production defect type exercises this" gap.** Both checked defect types (`label_overlap`, `element_cutoff`) have recipes; the LLM patcher path is therefore not exercised in the demo. It is covered by `tests/test_patcher_llm.py` via a `clear_registry()` monkeypatch that forces the fallback. Module docstring on `plotlint/patcher_llm.py` explicitly states this gap. The scaffold is ready for PL-1.x defect types that won't have deterministic recipes.
+
+3. **Recipes are pure string transformations on code.** Each `FixRecipe.apply(code, issue)` returns modified Python. Recipes append narrow matplotlib snippets at the end of user code (`plt.gcf().axes[i].tick_params(...)`). AST rewriting was deferred — string injection works for the current recipe set and the deliverable matches the architecture.md spec (`PatchResult.patched_code` is re-runnable code).
+
+4. **Recipe deduplication via fix_history.** Dispatcher filters out `(defect_type, recipe_id)` pairs already in `fix_history` before selecting a recipe. Prevents loop spin on a fix that didn't improve score. Without this guard, the patcher would re-apply the same recipe each iteration until `max_iterations`. Added `recipe_id` field to `FixAttempt` to support this.
+
+5. **`@recipe(DefectType)` decorator mirrors the existing `@check(name)` pattern.** Recipes register on import via `plotlint/fix_recipes/__init__.py`'s explicit-imports tail. Adding a recipe is one new file + one import line; the dispatcher and patcher never change. The inspector → patcher boundary stays clean: checks emit `Issue` objects, recipes consume them.
+
+6. **Rotation-aware overlap check.** `MatplotlibExtractor` now captures `label.get_rotation()` in metadata. `LabelOverlapCheck` skips AABB-based collision when both adjacent labels are rotated ≥15°. Reason: matplotlib's `get_window_extent()` returns the AABB of rotated text, which substantially overstates the actual visual footprint. Without this guard, the `rotate_x_labels` recipe couldn't resolve any overlap according to the inspector — score wouldn't improve, dispatcher would try the next recipe, also wouldn't improve, then exhaust. A future rotation-aware geometry test (rotated minimum bounding rectangles) can replace this 15° skip-rule.
+
+7. **Latent bugs from MVP.1 fixed in this MR.** `render_node` never incremented `iteration`; `inspect_node` never appended to `score_history`. The stub `patch_node` returning `{}` had masked these — once the dispatcher actually changed state, the loop's stagnation check would have spun forever. Fixed both with a dedicated regression test file (`tests/test_loop_iteration_increments.py`).
+
+8. **`PNGWriter` writes the final state only; demo captures original PNG itself.** Keeps `PNGWriter` a pure function of `ConvergenceState` (no renderer dependency). The demo invokes the renderer once before the loop to snapshot the original PNG. SoC: writers emit; renderers render; demos compose.
+
+9. **JSON report schema is minimal (asdict-based).** Not formalised as a pydantic model. If consumers need a stable contract, formalise in DI-4.3. Schema: name, iterations, final_score, score_history, fix_history (with recipe_id), final_issues, render_error, final_code.
+
+10. **`matplotlib>=3.9` added to core dependencies.** Was missing from `pyproject.toml`. Surfaced and fixed during the `.venv` setup for this MR — important hygiene for any future contributor not on miniconda.
+
+### Test Results
+
+434 passing in 39.42s (up from 368 at the MVP.7 baseline):
+- 7 new regression tests for the Off-1 fix (`test_loop_iteration_increments.py`)
+- 31 new tests for the recipe registry and individual recipes
+- 17 new tests across the patcher modules (deterministic, LLM fallback, dispatcher routing)
+- 10 new writer tests (PNG + JSON)
+- 5 new e2e tests with the real renderer and real recipes
+- Previous MVP.1–7 tests: all still passing (368 baseline)
+
+### Demo Behaviour
+
+`python examples/broken_chart_demo.py` with `ANTHROPIC_API_KEY=""`:
+
+| Chart | Initial score | Final score | Fixes applied | Iterations | LLM calls |
+|---|---|---|---|---|---|
+| overlap | 0.80 | **1.00** | 1 (`rotate_x_labels`) | 2 | 0 |
+| cutoff | 0.00 | **0.80** | 2 (`add_tight_layout`, `enlarge_figure`) | 4 | 0 |
+
+Both `examples/output/<name>_fixed.py` files run standalone with `python <path>`.
+
+### Unblocks
+
+- **B2.1** (Orchestrator-worker + scratchpad): the patcher / dispatcher pattern — single-purpose modules behind a routing layer with a registry — is the prototype for the per-step autodash orchestrator.
+- **B2.2** (Validation critic + provenance): `JSONReportWriter` schema is the precursor for per-number provenance lineage in autodash reports.
+- **B3.2** (Join inference): the recipe-registry + dispatcher pattern transfers directly — join-inference candidates register, validation acts as the dispatcher gating which join lands.
+- **PL-1.x** (new defect types with no deterministic recipe): the LLM patcher fallback is ready; each new check optionally pairs with one or more recipes. Defect types without recipes route to the LLM via the same dispatcher.
+- **PL-1.5** (Convergence GIF): per-iteration `png_bytes` flow through state; the GIF generator reads from a `progress_pngs` list (small additive extension to `ConvergenceState`).
+
+**Packages:** plotlint.
+
+## 2026-05-20: Resume — orthogonal-axis rescope, frontier research, post-pause documentation
+
+### Summary
+
+Reopened the project after a 3-month pause (last commit was MVP.7 on 2026-02-09). Rescoped the roadmap from a single L1–L4 tier ladder — which conflated infra and AI capability — into two orthogonal axes: **Axis A — Infra / Orchestration** (existing L1–L4) and **Axis B — AI Workflow Engineering** (new B1–B3 with 8 sub-stages). Captured a frontier-research snapshot covering multi-CSV agentic question-to-charts, enterprise adoption of AI auto-intelligence tools, research-agent transferable patterns, and the chart auto-fix landscape — landing on two genuinely unfilled territory pieces: deterministic chart auto-fix (Axis B1) and un-modelled multi-CSV agentic data analysis (Axis B3). Heavy-reframed `vision.md` around the two-axis model and added an enterprise-context primer for readers without a corporate-data background. No code changes.
+
+### Architecture (docs only)
+
+```
+roadmap restructure:
+
+  one axis (L1→L4)   ──>   two orthogonal axes (Axis A × Axis B)
+
+  Axis A: L1, L2, L3, L4                           (infra / orchestration)
+  Axis B: B1.1, B1.2,                              (chart patcher track)
+          B2.1, B2.2,                              (single-CSV agent maturity)
+          B3.1, B3.2, B3.3, B3.4                   (multi-CSV agent track)
+
+  Every MR addresses one (A-tier, B-stage) cell. Axes advance independently.
+```
+
+### New / Modified Files
+
+| File | Purpose |
+|---|---|
+| `feature_list.md` | **New.** Post-pause feature inventory — original MVP scope, current dev plan (built + forward), landscape audit, and §6 open design questions (deterministic patcher, multi-CSV agent). Layperson-readable (assumes no BI / data-analysis background). |
+| `frontier_research_2026-05.md` | **New.** Point-in-time landscape snapshot: enterprise primer, AI auto-intelligence adoption (Microsoft Copilot, Snowflake Cortex Analyst, Databricks Genie, Tableau Pulse, ThoughtSpot Spotter, etc.), multi-CSV agentic product landscape, academic frontier (Spider 2.0, HyperJoin, Magneto, Reflexion, CodeAct), research-agent transferable patterns (OpenAI / Anthropic / Perplexity / Gemini Deep Research), chart auto-fix landscape, gap call. |
+| `vision.md` | **Heavy reframe.** Executive summary opens with the two-axis grid; new `Axis A` / `Axis B` sibling sections; new `Enterprise context` section (~250 words for a reader without a corporate-data background); `Where this sits in the world` replaces the old portfolio-pitch framing. Guiding principles preserved verbatim, plus a new principle: **"Two axes, independent merges."** |
+| `development_plan.md` | **Updated.** Renamed `Forward roadmap — tiered deliverables` → `Axis A — Infra / Orchestration (L1–L4)`. Added `Axis B — AI Workflow Engineering` with 8 sub-stages each carrying scope / new files / pattern source / exit criteria. Added `Merge-request grid` section with an example-cell table and a recommended initial queue. Tech-stack table extended with agent-design-pattern / join-inference / replanning / provenance rows. New `Verification per Axis B stage` section. |
+
+### Key Design Decisions
+
+1. **Two orthogonal axes, independent merges.** Every MR addresses one (Axis A tier, Axis B stage) cell. No MR straddles axes. Mixing them entangles infra and AI-capability changes in ways that are hard to revert independently. This is the architectural choice that drives everything else in the new plan.
+
+2. **Heavy reframe of `vision.md` (per user choice).** Executive summary opens with the two-axis grid; existing problem / architecture content becomes supporting sections. Enterprise context promoted into `vision.md` (~250 words) so the headline doc explains *why* enterprise constraints shape Axis B3.4 — provenance, audit trail, sanity bounds, semantic-layer hook — rather than relegating that justification to the development plan.
+
+3. **Frontier research lives in a separate dated file.** `frontier_research_2026-05.md` is a point-in-time snapshot, not a living doc; refresh next time work resumes substantially later than this. Keeps `vision.md` and `development_plan.md` focused on design.
+
+4. **Old plan demoted to footnotes.** `development_plan_old.md` and `vision_old.md` remain in tree but are referenced only when discussing dropped features (Plotly support, full 9-defect taxonomy, multi-chart dashboard composition).
+
+5. **LangGraph stays for local Python (locked-in).** Inner convergence loop continues on LangGraph; future autodash outer orchestrator (B2.1) is also LangGraph (deep-agents pattern); Bedrock AgentCore replaces the outer orchestrator only in cloud (L3+). The local and cloud paths are honestly separate code paths, not a caravan-style swap.
+
+6. **Caravan deferred to L2.** Existing dev_plan said L1 should be caravan-routed, but L1 doesn't strictly need caravan to close the patcher loop. L1 uses the existing `LLMClient` / `AnthropicClient` directly. Caravan integration lands when L2's local pipeline forces the question.
+
+7. **Recommended initial MR queue (post-resume baseline).** L1 × B1.1 → L1 × B1.2 → L2 × B2.1 → L2 × B2.2 → L2 × B3.1 → **L2 × B3.2** (headline differentiator: first publishable multi-CSV agentic demo) → L3 × B3.2 (re-deploy on AgentCore) → L3 × B3.3 → L4 × B3.4 (enterprise-credible).
+
+### Frontier-Research Headline Findings
+
+- **No shipping product does un-modelled multi-CSV join inference autonomously.** ChatGPT Advanced Data Analysis, Julius AI, Hex Magic, Snowflake Cortex Analyst, Databricks Genie, Microsoft Copilot for Power BI / Fabric — all either require a pre-defined schema or defer joins back to the user. The agentic case is the frontier (Axis B3).
+- **No shipped open-source library applies mechanical fixes to matplotlib charts deterministically.** Detectors exist (`vislint_mpl`, Chartability); repairers exist as 2026 research papers (e.g. arXiv 2602.20291) but skip mechanical fixes and go straight to LLM. Genuine gap (Axis B1).
+- **Enterprise pain points are consistent across vendors.** Hallucination + trust, semantic-layer maintenance burden, security / compliance (EU AI Act, GDPR, HIPAA), cost surprises, change-management resistance, pilot-to-production gap (~45% of self-service BI implementations fail within 18 months — overwhelmingly from lack of governance, not lack of capability). This shapes Axis B3.4's non-negotiables: provenance, audit trail, sanity bounds, semantic-layer hook, explainability.
+- **Research-agent patterns transfer directly to multi-CSV data analysis.** Orchestrator-worker (Anthropic multi-agent research system) → parallel join hypothesis testing. Citation tracking → provenance tracking. Reflexion → join replanning. Scratchpad memory → accumulated schema understanding. Stop criteria → escalation to user clarification.
+
+### Unblocks
+
+- **L1 implementation** (Axis A tier-1 × Axis B B1.1 + B1.2) — the immediate next entry in this log.
+- **Future Axis B work** — B2/B3 modules now have concrete scope, exit criteria, and pattern sources rooted in the frontier-research snapshot.
+
+**Packages:** docs only (`vision.md`, `development_plan.md`, `feature_list.md`, `frontier_research_2026-05.md`).
+
 ## 2026-02-09: MVP.7 Inspector Foundation (Geometric Defect Detection)
 
 ### Summary
