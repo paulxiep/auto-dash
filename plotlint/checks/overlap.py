@@ -7,20 +7,35 @@ from plotlint.elements import ElementMap, ElementCategory
 from plotlint.models import Issue, DefectType, Severity
 
 
+# Below this rotation angle (degrees), a tick label is considered "upright"
+# and standard AABB overlap is meaningful. At or above this angle, the AABB
+# overstates the actual visual footprint (the rotated text takes a diagonal
+# strip, not the full AABB), so AABB-based collision is skipped.
+_ROTATION_TOLERANCE_DEG = 15.0
+
+
+def _is_rotated(label) -> bool:
+    return abs(label.metadata.get("rotation", 0.0)) >= _ROTATION_TOLERANCE_DEG
+
+
 @check("label_overlap")
 class LabelOverlapCheck:
     """Detect overlapping tick labels on x and y axes.
 
     Algorithm:
     1. Get all tick labels (grouped by axis)
-    2. For each adjacent pair, check bbox overlap
-    3. Compute overlap fraction for severity
-    4. Report: how many labels collide, which ones, severity
+    2. For each adjacent pair, check bbox overlap.
+       - If BOTH labels in the pair are rotated >= 15°, skip the AABB test:
+         the AABB after rotation overstates the true footprint, and the
+         deterministic rotate-x-labels recipe would otherwise never appear
+         to resolve overlap. Treat rotated pairs as non-colliding for AABB
+         purposes; a future rotation-aware geometry test can replace this.
+    3. Compute overlap fraction for severity.
 
     Severity heuristic:
-    - > 50% of labels overlap → HIGH
-    - > 20% of labels overlap → MEDIUM
-    - any overlap → LOW
+    - > 50% of pairs collide → HIGH
+    - > 20% of pairs collide → MEDIUM
+    - any collision         → LOW
     """
     name = "label_overlap"
 
@@ -39,7 +54,10 @@ class LabelOverlapCheck:
 
             collisions = 0
             for i in range(len(labels) - 1):
-                if labels[i].bbox.overlaps(labels[i + 1].bbox):
+                a, b = labels[i], labels[i + 1]
+                if _is_rotated(a) and _is_rotated(b):
+                    continue
+                if a.bbox.overlaps(b.bbox):
                     collisions += 1
 
             if collisions > 0:

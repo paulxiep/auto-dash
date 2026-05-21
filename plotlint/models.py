@@ -96,7 +96,13 @@ class InspectionResult:
 class FixAttempt:
     """Record of a single patch attempt.
 
-    Used for history tracking and deduplication (PL-1.2).
+    Used for history tracking and deduplication.
+
+    `score_after` is None at construction time (in patch_node) — the post-patch
+    score is unknown until the next render+inspect pass completes. inspect_node
+    finalises the most recent FixAttempt by replacing it with a copy that has
+    score_after set. `improved` and prompt-history formatters handle the
+    pending state (None) gracefully.
     """
 
     iteration: int
@@ -104,11 +110,32 @@ class FixAttempt:
     description: str
     code_hash: str
     score_before: float
-    score_after: float
+    score_after: Optional[float] = None  # finalised by inspect_node
+    recipe_id: Optional[str] = None  # set for deterministic patches; None for LLM
 
     @property
     def improved(self) -> bool:
-        return self.score_after > self.score_before
+        return self.score_after is not None and self.score_after > self.score_before
+
+    @property
+    def is_finalised(self) -> bool:
+        return self.score_after is not None
+
+
+@dataclass(frozen=True)
+class PatchResult:
+    """Output of a single successful patch attempt.
+
+    Emitted by both DeterministicPatcher (via a FixRecipe) and LLMPatcher.
+    Communication contract between the patcher modules and the convergence loop.
+    """
+
+    patched_code: str
+    code_hash: str                  # sha256 of patched_code; for dedup + FixAttempt
+    target_issue: DefectType
+    description: str                # human-readable: "Rotated x-axis labels 45°"
+    used_llm: bool
+    recipe_id: Optional[str] = None  # set for deterministic; None for LLM
 
 
 @dataclass(frozen=True)
@@ -168,6 +195,11 @@ class ConvergenceState(TypedDict, total=False):
 
     # Patcher output (set by patch node - MVP.8)
     patch_applied: bool
+
+    # Hard-stop reason set by patch_node when no patcher could fix the
+    # highest-severity issue (no recipe AND no LLM). Distinct from
+    # render_error so that a successful re-render cannot clear it.
+    stop_reason: Optional[str]
 
     # Renderer bundle reference
     renderer_type: str

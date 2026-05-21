@@ -57,8 +57,8 @@ class AnthropicClient:
         self,
         config: LLMConfig,
         api_key: str = "",
-        default_model: str = "claude-sonnet-4-5-20250929",
-        vision_model: str = "claude-sonnet-4-5-20250929",
+        default_model: str = "claude-sonnet-4-6",
+        vision_model: str = "claude-sonnet-4-6",
     ) -> None:
         self.config = config
         self.default_model = default_model

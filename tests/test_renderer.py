@@ -239,11 +239,13 @@ ax.bar([1, 2], [3, 4])
 
 class TestRendererBundle:
     def test_matplotlib_bundle_creates_bundle(self):
+        from plotlint.extractors.matplotlib import MatplotlibExtractor
+
         bundle = matplotlib_bundle()
         assert isinstance(bundle, RendererBundle)
         assert bundle.renderer_type == "matplotlib"
         assert isinstance(bundle.renderer, MatplotlibRenderer)
-        assert bundle.extractor is None  # Until MVP.7
+        assert isinstance(bundle.extractor, MatplotlibExtractor)
 
     def test_matplotlib_bundle_passes_config(self):
         bundle = matplotlib_bundle(dpi=150, timeout_seconds=60)
